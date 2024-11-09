@@ -27,8 +27,9 @@ RUN rm -rf node_modules
 RUN bun install --production
 
 # Add Tini init-system
+ENV TINI_ARCH arm64
 ENV TINI_VERSION v0.19.0
-ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static /tini
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}-${TINI_ARCH}/tini-static /tini
 RUN chmod +x /tini
 
 FROM oven/bun AS release

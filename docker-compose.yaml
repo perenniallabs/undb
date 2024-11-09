@@ -1,0 +1,16 @@
+services:
+  undb:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: undb
+    ports:
+      - 3721:3721
+    environment:
+      - UNDB_BASE_URL=http://localhost:3721
+      - UNDB_DISABLE_REGISTRATION=true
+      - UNDB_ADMIN_EMAIL=${ADMIN_EMAIL}
+      - UNDB_ADMIN_PASSWORD=${ADMIN_PASSWORD}
+    volumes:
+      - .:/app
+      - /app/node_modules

@@ -18,6 +18,7 @@ COPY --from=install /temp/dev/node_modules node_modules
 COPY . .
 RUN mkdir .undb
 
+ENV NODE_OPTIONS="--max-old-space-size=10240"
 ENV NODE_ENV=production
 ENV PORT=3721
 RUN bun run build:docker

@@ -11,6 +11,10 @@ services:
       - UNDB_DISABLE_REGISTRATION=true
       - UNDB_ADMIN_EMAIL=${ADMIN_EMAIL}
       - UNDB_ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - UNDB_MAIL_HOST=${MAIL_HOST}
+      - UNDB_MAIL_PORT=${MAIL_PORT}
+      - UNDB_MAIL_USER=${MAIL_USER}
+      - UNDB_MAIL_PASS=${MAIL_PASS}
     volumes:
       - ./undb.sqlite:/usr/src/app/undb.sqlite
       - ${STORAGE_DIR}:/usr/src/app/.undb/storage

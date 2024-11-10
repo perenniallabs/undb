@@ -15,6 +15,7 @@ services:
       - UNDB_MAIL_PORT=${MAIL_PORT}
       - UNDB_MAIL_USER=${MAIL_USER}
       - UNDB_MAIL_PASS=${MAIL_PASS}
+      - UNDB_MAIL_DEFAULT_FROM=${MAIL_FROM}
     volumes:
       - ./undb.sqlite:/usr/src/app/undb.sqlite
       - ${STORAGE_DIR}:/usr/src/app/.undb/storage

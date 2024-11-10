@@ -12,5 +12,5 @@ services:
       - UNDB_ADMIN_EMAIL=${ADMIN_EMAIL}
       - UNDB_ADMIN_PASSWORD=${ADMIN_PASSWORD}
     volumes:
-      - .:/app
-      - /app/node_modules
+      - ./undb.sqlite:/app/apps/backend/undb.sqlite
+      - ./storage:/app/apps/backend/storage

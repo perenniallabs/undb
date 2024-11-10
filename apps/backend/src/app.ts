@@ -95,6 +95,7 @@ export const app = new Elysia()
     staticPlugin({
       assets: "./.undb/storage",
       prefix: "/public",
+      noCache: true,
     }),
   )
   .onRequest((ctx) => {

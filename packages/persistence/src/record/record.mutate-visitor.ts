@@ -72,6 +72,7 @@ import {
   type UserEmpty,
   type UserEqual,
 } from "@undb/table"
+import { startOfDay, startOfToday, startOfTomorrow, startOfYesterday } from "date-fns"
 import { sql, type ExpressionBuilder } from "kysely"
 import { unique } from "radash"
 import { AbstractQBMutationVisitor } from "../abstract-qb.visitor"
@@ -122,7 +123,21 @@ export class RecordMutateVisitor extends AbstractQBMutationVisitor implements IR
     this.setData(spec.fieldId.value, null)
   }
   dateEqual(spec: DateEqual): void {
-    this.setData(spec.fieldId.value, spec.date?.getTime() ?? null)
+    if (spec.date === "@now") {
+      const start = startOfDay(new Date())
+      this.setData(spec.fieldId.value, start.getTime())
+    } else if (spec.date === "@today") {
+      const start = startOfToday()
+      this.setData(spec.fieldId.value, start.getTime())
+    } else if (spec.date === "@yesterday") {
+      const start = startOfYesterday()
+      this.setData(spec.fieldId.value, start.getTime())
+    } else if (spec.date === "@tomorrow") {
+      const start = startOfTomorrow()
+      this.setData(spec.fieldId.value, start.getTime())
+    } else {
+      this.setData(spec.fieldId.value, spec.date?.getTime() ?? null)
+    }
   }
   dateRangeEqual(spec: DateRangeEqual): void {
     const field = this.table.schema.getFieldById(new FieldIdVo(spec.fieldId.value)).expect("No field found")
@@ -303,16 +318,19 @@ export class RecordMutateVisitor extends AbstractQBMutationVisitor implements IR
         if (value === "@me") {
           return this.context.getCurrentUserId()
         }
+
+        return null
       }
 
       return value
     }
 
     if (Array.isArray(value)) {
-      const converted = unique(value.map(convertMacro))
+      const converted = unique(value.map(convertMacro).filter(Boolean))
       this.setData(spec.fieldId.value, JSON.stringify(converted))
     } else {
-      this.setData(spec.fieldId.value, value ? convertMacro(value) : null)
+      const converted = value ? convertMacro(value) : null
+      this.setData(spec.fieldId.value, converted)
     }
   }
   userEmpty(spec: UserEmpty): void {

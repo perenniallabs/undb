@@ -11,7 +11,8 @@ import {
 import type { TableDo } from "../../table.do"
 import type { FormVO } from "../forms"
 import type { IRecordValues } from "../records/record/record-values.vo"
-import type { View } from "../views"
+import { type IPivotAggregate, type View } from "../views"
+import { isValidColumnLabel, isValidRowLabel, isValidValueField } from "../views/view/variants/pivot-view.vo"
 import type { ICreateSchemaDTO } from "./dto"
 import type { ISchemaDTO } from "./dto/schema.dto"
 import {
@@ -367,5 +368,17 @@ export class Schema extends ValueObject<Field[]> {
 
   getGalleryFields(fields: Field[] = this.fields) {
     return fields.filter((f) => f.type === "attachment")
+  }
+
+  getPivotFields(type: "column" | "row", fields: Field[] = this.fields) {
+    if (type === "column") {
+      return fields.filter(isValidColumnLabel)
+    }
+
+    return fields.filter(isValidRowLabel)
+  }
+
+  getPivotValueFields(aggregate: IPivotAggregate, fields: Field[] = this.fields) {
+    return fields.filter((field) => isValidValueField(aggregate, field))
   }
 }

@@ -130,6 +130,33 @@ export class RecordFilterVisitor extends AbstractQBVisitor<RecordDO> implements 
     this.addCond(cond)
   }
   dateEqual(spec: DateEqual): void {
+    if (spec.date === "@now") {
+      const now = new Date()
+      const start = startOfDay(now).getTime()
+      const end = endOfDay(now).getTime()
+      const cond = this.eb.between(this.getFieldId(spec), start, end)
+      this.addCond(cond)
+      return
+    } else if (spec.date === "@today") {
+      const start = startOfToday().getTime()
+      const end = endOfToday().getTime()
+      const cond = this.eb.between(this.getFieldId(spec), start, end)
+      this.addCond(cond)
+      return
+    } else if (spec.date === "@yesterday") {
+      const start = startOfYesterday().getTime()
+      const end = endOfYesterday().getTime()
+      const cond = this.eb.between(this.getFieldId(spec), start, end)
+      this.addCond(cond)
+      return
+    } else if (spec.date === "@tomorrow") {
+      const start = startOfTomorrow().getTime()
+      const end = endOfTomorrow().getTime()
+      const cond = this.eb.between(this.getFieldId(spec), start, end)
+      this.addCond(cond)
+      return
+    }
+
     const time = spec.date?.getTime()
     if (time === null) {
       const cond = this.eb.eb(this.getFieldId(spec), "is", null)

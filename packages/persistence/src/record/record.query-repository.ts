@@ -4,11 +4,14 @@ import { None, Option, Some, type PaginatedDTO } from "@undb/domain"
 import {
   AUTO_INCREMENT_TYPE,
   ID_TYPE,
+  SelectField,
   TableIdVo,
   injectTableRepository,
   type AggregateResult,
   type CountQueryArgs,
   type Field,
+  type IGetPivotDataOutput,
+  type IPivotAggregate,
   type IRecordDTO,
   type IRecordQueryRepository,
   type ITableRepository,
@@ -22,9 +25,11 @@ import {
   type View,
   type ViewId,
 } from "@undb/table"
-import { type AliasedExpression, type Expression } from "kysely"
+import { getTableName } from "drizzle-orm"
+import { sql, type AliasedExpression, type Expression, type ExpressionBuilder } from "kysely"
 import type { IRecordQueryBuilder } from "../qb"
 import { injectQueryBuilder } from "../qb.provider"
+import { users } from "../tables"
 import { UnderlyingTable } from "../underlying/underlying-table"
 import { RecordQueryHelper } from "./record-query.helper"
 import { RecordReferenceVisitor } from "./record-reference-visitor"
@@ -125,6 +130,126 @@ export class RecordQueryRepository implements IRecordQueryRepository {
 
     const records = result.map((r) => getRecordDTOFromEntity(table, r, foreignTables))
     return { values: records, total: Number(total) }
+  }
+
+  async getPivotData(table: TableDo, viewId: string): Promise<IGetPivotDataOutput> {
+    const view = table.views.getViewById(viewId)
+
+    if (view.type !== "pivot") {
+      throw new Error("Invalid view type")
+    }
+    if (!view.isValid) {
+      throw new Error("Invalid view")
+    }
+
+    const columnLabel = view.columnLabel.unwrap()!
+    const rowLabel = view.rowLabel.unwrap()!
+    const value = view.value.unwrap()!
+    const aggregate = view.pivotAggregate.unwrap()!
+
+    const columnField = table.schema.getFieldByIdOrName(columnLabel).into(undefined) as SelectField | undefined
+    const rowField = table.schema.getFieldByIdOrName(rowLabel).into(undefined)
+    const valueField = table.schema.getFieldByIdOrName(value).into(undefined)
+    if (!columnField || !rowField) {
+      throw new Error("Invalid view")
+    }
+
+    function convertAggFn(aggFn: IPivotAggregate) {
+      aggFn = aggFn.toLowerCase() as IPivotAggregate
+      if (aggFn === "average") {
+        return "avg"
+      }
+      return aggFn
+    }
+
+    const options = columnField.options
+    const aggFn = convertAggFn(aggregate)
+
+    const t = new UnderlyingTable(table)
+    const createSelects =
+      (isTotal = false) =>
+      (eb: ExpressionBuilder<any, any>) => {
+        const selects: AliasedExpression<any, any>[] = [
+          isTotal ? sql.raw("'Total'").as("label") : eb.ref(`${t.name}.${rowField.id.value}`).as("label"),
+        ]
+
+        if (rowField.type === "user") {
+          if (!isTotal) {
+            const user = getTableName(users)
+
+            const q = eb
+              .selectFrom(user)
+              .select(
+                eb
+                  .fn("json_object", [
+                    sql.raw("'username'"),
+                    eb.fn.coalesce(`${user}.${users.username.name}`, sql`NULL`),
+                    sql.raw("'email'"),
+                    eb.fn.coalesce(`${user}.${users.email.name}`, sql`NULL`),
+                  ])
+                  .as("labelValues"),
+              )
+              .whereRef(rowField.id.value, "=", `${user}.${users.id.name}`)
+              .limit(1)
+              .as("labelValues")
+
+            selects.push(q)
+          } else {
+            selects.push(sql`NULL`.as("labelValues"))
+          }
+        }
+
+        const columnSelects = options
+          .map((option) => {
+            if (aggFn === "count") {
+              const caseString = `count(CASE WHEN "${t.name}"."${columnField.id.value}" = '${option.id}' THEN 1 END)`
+              return [sql.raw(`'${option.name}'`), sql.raw(caseString)]
+            } else {
+              if (!valueField) {
+                throw new Error("value field is required")
+              }
+
+              let valueFieldAlias = `${t.name}.${valueField.id.value}`
+              if (valueField.type === "currency") {
+                valueFieldAlias = `${t.name}.${valueField.id.value} / 100`
+              }
+
+              const caseString =
+                `${aggFn}(CASE WHEN ` +
+                `"${t.name}"."${columnField.id.value}" = '${option.id}' ` +
+                `THEN ${valueFieldAlias} ` +
+                `END)`
+              return [sql.raw(`'${option.name}'`), sql.raw(caseString)]
+            }
+          })
+          .flat()
+
+        selects.push(eb.fn("json_object", columnSelects).as("values"))
+
+        if (aggFn === "count") {
+          selects.push(sql.raw(`sum(CASE WHEN "${t.name}"."${columnField.id.value}" IS NOT NULL THEN 1 END)`).as(`agg`))
+        } else {
+          if (!valueField) {
+            throw new Error("value field is required")
+          }
+          const rowTotalString =
+            valueField.type === "currency"
+              ? `${aggFn}("${t.name}"."${valueField.id.value}") / 100`
+              : `${aggFn}("${t.name}"."${valueField.id.value}")`
+          selects.push(sql.raw(rowTotalString).as(`agg`))
+        }
+
+        return selects
+      }
+
+    const result = await this.qb
+      .selectFrom(t.name)
+      .select(createSelects())
+      .groupBy(`${t.name}.${rowField.id.value}`)
+      .unionAll((qb) => qb.selectFrom(t.name).select(createSelects(true)))
+      .execute()
+
+    return result as IGetPivotDataOutput
   }
 
   async aggregate(

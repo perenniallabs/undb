@@ -147,9 +147,11 @@ import {
   GetApiTokensQuery,
   GetDashboardByIdQuery,
   GetMemberSpacesQuery,
+  GetPivotDataQuery,
   GetRecordByIdQuery,
   GetRecordsQuery,
   GetShareAggregatesQuery,
+  GetSharePivotDataQuery,
   GetShareRecordByIdQuery,
   GetShareRecordsQuery,
   GetTableQuery,
@@ -164,9 +166,11 @@ import {
   getDashboardByIdQuery,
   getMemberSpacesOutput,
   getMemberSpacesQuery,
+  getPivotDataQuery,
   getRecordByIdQuery,
   getRecordsQuery,
   getShareAggregatesQuery,
+  getSharePivotDataQuery,
   getShareRecordByIdQuery,
   getShareRecordsQuery,
   getTableQuery,
@@ -349,6 +353,10 @@ const recordRouter = t.router({
     .use(authz("record:read"))
     .input(getRecordByIdQuery)
     .query(({ input }) => queryBus.execute(new GetRecordByIdQuery(input))),
+  pivot: privateProcedure
+    .use(authz("record:read"))
+    .input(getPivotDataQuery)
+    .query(({ input }) => queryBus.execute(new GetPivotDataQuery(input))),
   count: privateProcedure
     .use(authz("record:read"))
     .input(countRecordsQuery)
@@ -467,6 +475,9 @@ const shareDataRouter = t.router({
   aggregate: publicProcedure
     .input(getShareAggregatesQuery)
     .query(({ input }) => queryBus.execute(new GetShareAggregatesQuery(input))),
+  pivot: publicProcedure
+    .input(getSharePivotDataQuery)
+    .query(({ input }) => queryBus.execute(new GetSharePivotDataQuery(input))),
 })
 
 const authzRouter = t.router({

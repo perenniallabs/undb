@@ -1,5 +1,5 @@
 import type { ISpaceMemberRole } from "@undb/authz"
-import type { FieldType,IFieldAggregate,IFieldMacro,IOpType,IRollupFn,ViewType } from "@undb/table"
+import type { CalendarTimeScale,FieldType,IFieldAggregate,IFieldMacro,IOpType,IRollupFn,ViewType } from "@undb/table"
 import type { BaseTranslation } from "../i18n-types.js"
 
 const ops: Record<IOpType, string> = {
@@ -133,6 +133,13 @@ const widgetTypes: Record<string, string> = {
   table: "Table"
 }
 
+
+const timeScales: Record<CalendarTimeScale, string> = {
+  month: "Month",
+  week: "Week",
+  day: "Day"
+}
+
 const en = {
   table: {
     ops,
@@ -143,6 +150,7 @@ const en = {
     macros,
     viewTypes,
     widgetTypes,
+    timeScales,
   },
 } satisfies BaseTranslation
 

@@ -16,6 +16,8 @@
   import IdControl from "../field-control/id-control.svelte"
   import type { ICreateRecordCommandOutput } from "@undb/commands"
   import { onMount } from "svelte"
+  import { LL } from "@undb/i18n/client"
+  import { getIsLocal } from "$lib/store/data-service.store"
 
   // beforeNavigate(({ cancel }) => {
   //   if ($tainted) {
@@ -39,6 +41,7 @@
   const client = useQueryClient()
 
   const mediaQuery = useMediaQuery("(max-width: 768px)")
+  const isLocal = getIsLocal()
 
   const createRecordMutation = createMutation(
     derived([table], ([$table]) => ({
@@ -48,9 +51,9 @@
         client.invalidateQueries({
           queryKey: ["records", $table.id.value],
         })
-        toast.success("Record has been created!")
+        toast.success($LL.table.record.createdRecord())
         onSuccess?.(data)
-        recordsStore?.invalidateRecord($table, data)
+        recordsStore?.invalidateRecord(isLocal, $table, data)
       },
       onError: (error: Error) => {
         toast.error(error.message)
@@ -141,7 +144,7 @@
               field={idField}
               class={cn($errors[ID_TYPE] && "border-red-500 focus-visible:ring-0")}
               tabIndex={-1}
-              placeholder="Leave blank to auto generate..."
+              placeholder={$LL.table.field.id.placeholder()}
             />
             <Form.FieldErrors class="mt-2" />
           </div>

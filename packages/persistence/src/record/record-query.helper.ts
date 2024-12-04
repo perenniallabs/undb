@@ -3,9 +3,10 @@ import { singleton } from "@undb/di"
 import type { IPagination, Option } from "@undb/domain"
 import { FieldIdVo, type Field, type IViewSort, type RecordComositeSpecification, type TableDo } from "@undb/table"
 import { sql, type ExpressionBuilder, type SelectQueryBuilder } from "kysely"
-import { getAnonymousTransaction } from "../ctx"
-import type { IRecordQueryBuilder } from "../qb"
+import type { ITxContext } from "../ctx.interface"
+import { injectTxCTX } from "../ctx.provider"
 import { injectQueryBuilder } from "../qb.provider"
+import type { IRecordQueryBuilder } from "../qb.type"
 import { UnderlyingTable } from "../underlying/underlying-table"
 import { RecordQueryCreatorVisitor } from "./record-query-creator-visitor"
 import { RecordQuerySpecCreatorVisitor } from "./record-query-spec-creator-visitor"
@@ -21,6 +22,8 @@ export class RecordQueryHelper {
     public readonly qb: IRecordQueryBuilder,
     @injectContext()
     private readonly context: IContext,
+    @injectTxCTX()
+    private readonly txContext: ITxContext,
   ) {}
 
   createQueryCreator(
@@ -29,7 +32,7 @@ export class RecordQueryHelper {
     visibleFields: Field[],
     spec: Option<RecordComositeSpecification>,
   ) {
-    const trx = getAnonymousTransaction() ?? this.qb
+    const trx = this.txContext.getAnonymousTransaction()
 
     let qb = new RecordQueryCreatorVisitor(trx, table, foreignTables, visibleFields).create()
     const visitor = new RecordQuerySpecCreatorVisitor(trx, qb, table)

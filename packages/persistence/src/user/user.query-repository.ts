@@ -1,8 +1,8 @@
 import { singleton } from "@undb/di"
 import { None, Some, type Option } from "@undb/domain"
 import type { IUser, IUserQueryRepository } from "@undb/user"
-import type { IQueryBuilder } from "../qb"
 import { injectQueryBuilder } from "../qb.provider"
+import type { IQueryBuilder } from "../qb.type"
 
 @singleton()
 export class UserQueryRepository implements IUserQueryRepository {

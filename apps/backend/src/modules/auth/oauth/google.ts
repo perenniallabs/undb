@@ -1,15 +1,15 @@
 import { type ISpaceMemberService, injectSpaceMemberService } from "@undb/authz"
+import { type IContext, injectContext } from "@undb/context"
 import { setContextValue } from "@undb/context/server"
 import { singleton } from "@undb/di"
 import { createLogger } from "@undb/logger"
-import { type IQueryBuilder, getCurrentTransaction, injectQueryBuilder } from "@undb/persistence"
+import { type IQueryBuilder, type ITxContext, injectQueryBuilder, injectTxCTX } from "@undb/persistence/server"
 import { type ISpaceService, injectSpaceService } from "@undb/space"
 import { Google, generateCodeVerifier } from "arctic"
 import { env } from "bun"
 import { Elysia } from "elysia"
 import { type Lucia, generateIdFromEntropySize } from "lucia"
 import { OAuth2RequestError, generateState } from "oslo/oauth2"
-import { withTransaction } from "../../../db"
 import { injectLucia } from "../auth.provider"
 import { injectGoogleProvider } from "./google.provider"
 
@@ -26,6 +26,10 @@ export class GoogleOAuth {
     private readonly google: Google,
     @injectLucia()
     private readonly lucia: Lucia,
+    @injectTxCTX()
+    private readonly txContext: ITxContext,
+    @injectContext()
+    private readonly context: IContext,
   ) {}
 
   private logger = createLogger(GoogleOAuth.name)
@@ -35,9 +39,7 @@ export class GoogleOAuth {
       .get("/login/google", async (ctx) => {
         const state = generateState()
         const codeVerifier = generateCodeVerifier()
-        const url = await this.google.createAuthorizationURL(state, codeVerifier, {
-          scopes: ["email", "profile"],
-        })
+        const url = this.google.createAuthorizationURL(state, codeVerifier, ["email", "profile"])
 
         ctx.cookie["state"].set({
           value: state,
@@ -76,7 +78,7 @@ export class GoogleOAuth {
           const tokens = await this.google.validateAuthorizationCode(code, storedCodeVerifier)
           const googleUserResponse = await fetch("https://www.googleapis.com/oauth2/v1/userinfo", {
             headers: {
-              Authorization: `Bearer ${tokens.accessToken}`,
+              Authorization: `Bearer ${tokens.accessToken()}`,
             },
           })
           const googleUserResult: GoogleUserResult = await googleUserResponse.json()
@@ -111,7 +113,7 @@ export class GoogleOAuth {
             .executeTakeFirst()
 
           if (existingGoogleUser) {
-            const space = await this.spaceService.setSpaceContext(setContextValue, { userId: existingGoogleUser.id })
+            const space = await this.spaceService.setSpaceContext(this.context, { userId: existingGoogleUser.id })
 
             await this.queryBuilder
               .insertInto("undb_oauth_account")
@@ -133,8 +135,8 @@ export class GoogleOAuth {
             })
           }
           const userId = generateIdFromEntropySize(10) // 16 characters long
-          const space = await withTransaction(this.queryBuilder)(async () => {
-            const tx = getCurrentTransaction()
+          const space = await this.txContext.withTransaction(async () => {
+            const tx = this.txContext.getCurrentTransaction()
             await tx
               .insertInto("undb_user")
               .values({

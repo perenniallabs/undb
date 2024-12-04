@@ -14,7 +14,7 @@ import {
 import { getNextName } from "@undb/utils"
 import { type IBaseTemplateDTO } from "./dto/template-schema.dto"
 
-type TemplateDTO = {
+export type TemplateDTO = {
   base: Base
   tables: {
     table: TableDo
@@ -54,6 +54,7 @@ export class TemplateFactory {
         const records = table.records?.map((record: IFlattenCreateRecordDTO) => flattenToCreateRecordDTO(record))
 
         return {
+          id: table.id,
           baseId,
           name,
           schema,

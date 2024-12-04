@@ -1,5 +1,4 @@
 import { injectContext, type IContext } from "@undb/context"
-import { executionContext } from "@undb/context/server"
 import { inject, singleton } from "@undb/di"
 import { None, Some, type Option } from "@undb/domain"
 import {
@@ -21,7 +20,8 @@ import {
 } from "@undb/table"
 import { chunk } from "es-toolkit/array"
 import { sql, type CompiledQuery, type ExpressionBuilder } from "kysely"
-import { getAnonymousTransaction } from "../ctx"
+import type { ITxContext } from "../ctx.interface"
+import { injectTxCTX } from "../ctx.provider"
 import { UnderlyingTable } from "../underlying/underlying-table"
 import { RecordQueryHelper } from "./record-query.helper"
 import { getRecordDTOFromEntity } from "./record-utils"
@@ -41,6 +41,8 @@ export class RecordRepository implements IRecordRepository {
     private readonly helper: RecordQueryHelper,
     @injectContext()
     private readonly context: IContext,
+    @injectTxCTX()
+    private readonly txContext: ITxContext,
   ) {}
 
   private async getForeignTables(table: TableDo, fields: Field[]): Promise<Map<string, TableDo>> {
@@ -56,9 +58,8 @@ export class RecordRepository implements IRecordRepository {
   }
 
   async insert(table: TableDo, record: RecordDO): Promise<void> {
-    const trx = getAnonymousTransaction()
-    const context = executionContext.getStore()
-    const userId = context?.user?.userId!
+    const trx = this.txContext.getAnonymousTransaction()
+    const userId = this.context.mustGetCurrentUserId()
 
     const t = new UnderlyingTable(table)
 
@@ -88,9 +89,8 @@ export class RecordRepository implements IRecordRepository {
   }
 
   async #bulkInsert(table: TableDo, records: RecordDO[]): Promise<void> {
-    const trx = getAnonymousTransaction()
-    const context = executionContext.getStore()
-    const userId = context?.user?.userId!
+    const trx = this.txContext.getAnonymousTransaction()
+    const userId = this.context.mustGetCurrentUserId()
 
     const t = new UnderlyingTable(table)
 
@@ -202,10 +202,9 @@ export class RecordRepository implements IRecordRepository {
 
   async updateOneById(table: TableDo, record: RecordDO, spec: Option<RecordComositeSpecification>): Promise<void> {
     if (spec.isNone()) return
-    const trx = getAnonymousTransaction()
+    const trx = this.txContext.getAnonymousTransaction()
 
-    const context = executionContext.getStore()
-    const userId = context?.user?.userId!
+    const userId = this.context.mustGetCurrentUserId()
 
     const t = new UnderlyingTable(table)
     const sql: CompiledQuery[] = []
@@ -237,9 +236,8 @@ export class RecordRepository implements IRecordRepository {
     update: RecordComositeSpecification,
     records: RecordDO[],
   ): Promise<void> {
-    const trx = getAnonymousTransaction()
-    const context = executionContext.getStore()
-    const userId = context?.user?.userId!
+    const trx = this.txContext.getAnonymousTransaction()
+    const userId = this.context.mustGetCurrentUserId()
 
     const t = new UnderlyingTable(table)
     const queries: CompiledQuery[] = []
@@ -297,14 +295,14 @@ export class RecordRepository implements IRecordRepository {
   async deleteOneById(table: TableDo, record: RecordDO): Promise<void> {
     const t = new UnderlyingTable(table)
 
-    const trx = getAnonymousTransaction()
+    const trx = this.txContext.getAnonymousTransaction()
     await trx.deleteFrom(t.name).where(ID_TYPE, "=", record.id.value).executeTakeFirst()
     await this.outboxService.save(record)
   }
 
   async deleteByIds(table: TableDo, records: RecordDO[]): Promise<void> {
     const t = new UnderlyingTable(table)
-    const trx = getAnonymousTransaction()
+    const trx = this.txContext.getAnonymousTransaction()
     const ids = records.map((r) => r.id.value)
     await trx.deleteFrom(t.name).where(ID_TYPE, "in", ids).executeTakeFirst()
     await this.outboxService.saveMany(records)

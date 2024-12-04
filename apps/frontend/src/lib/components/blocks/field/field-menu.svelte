@@ -24,6 +24,7 @@
   import * as Alert from "$lib/components/ui/alert"
   import { preferences } from "$lib/store/persisted.store"
   import { hasPermission } from "$lib/store/space-member.store"
+  import { LL } from "@undb/i18n/client"
 
   export let field: Field
   const table = getTable()
@@ -55,14 +56,14 @@
   const deleteField = createMutation({
     mutationFn: trpc.table.field.delete.mutate,
     async onSuccess() {
-      toast.success("Delete field success")
+      toast.success($LL.table.field.deleted())
       await invalidate(`undb:table:${$table.id.value}`)
       await client.invalidateQueries({ queryKey: ["records", $table.id.value] })
       open = false
       deleteAlertOpen = false
     },
     onError(error, variables, context) {
-      toast.error("Delete field failed")
+      toast.error($LL.table.field.deleteFailed())
     },
   })
 
@@ -113,7 +114,7 @@
             on:click={() => (update = true)}
           >
             <PencilIcon class="mr-2 h-3 w-3" />
-            Update Field
+            {$LL.table.field.update()}
           </Button>
         {/if}
 
@@ -127,14 +128,14 @@
                   variant="outline"
                 >
                   <TrashIcon class="mr-2 h-3 w-3" />
-                  Duplicate Field
+                  {$LL.table.field.duplicate()}
                 </Button>
               {/if}
             </AlertDialog.Trigger>
             <AlertDialog.Content>
               <AlertDialog.Header>
-                <AlertDialog.Title>Duplicate field</AlertDialog.Title>
-                <AlertDialog.Description>Are you sure to duplicate the following field?</AlertDialog.Description>
+                <AlertDialog.Title>{$LL.table.field.duplicate()}</AlertDialog.Title>
+                <AlertDialog.Description>{$LL.table.field.duplicateDescription()}</AlertDialog.Description>
               </AlertDialog.Header>
 
               <div
@@ -146,11 +147,11 @@
 
               <Label class="flex items-center gap-2">
                 <Checkbox bind:checked={$preferences.duplicateFieldIncludeData} />
-                Include data
+                {$LL.table.record.includeData()}
               </Label>
 
               <AlertDialog.Footer>
-                <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+                <AlertDialog.Cancel>{$LL.common.cancel()}</AlertDialog.Cancel>
                 <AlertDialog.Action
                   on:click={() => {
                     $duplicateField.mutate({
@@ -160,7 +161,7 @@
                     })
                   }}
                 >
-                  Duplicate field
+                  {$LL.table.field.duplicate()}
                 </AlertDialog.Action>
               </AlertDialog.Footer>
             </AlertDialog.Content>
@@ -174,7 +175,7 @@
                   variant="outline"
                 >
                   <TrashIcon class="mr-2 h-3 w-3" />
-                  Delete Field
+                  {$LL.table.field.delete()}
                 </Button>
               {/if}
             </AlertDialog.Trigger>
@@ -183,7 +184,7 @@
                 <AlertDialog.Title class="flex items-center">
                   <TrashIcon class="mr-2 h-4 w-4" />
                   <div class="flex items-center gap-2">
-                    Delete field
+                    {$LL.table.field.delete()}
 
                     <span
                       data-field-id={field.id.value}
@@ -195,8 +196,7 @@
                   </div>
                 </AlertDialog.Title>
                 <AlertDialog.Description>
-                  Are you sure you want to delete the following field? All data associated with this field will be
-                  delete perminently from table.
+                  {$LL.table.field.deleteConfirm()}
                 </AlertDialog.Description>
               </AlertDialog.Header>
 
@@ -286,7 +286,7 @@
               {/if}
 
               <AlertDialog.Footer>
-                <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+                <AlertDialog.Cancel>{$LL.common.cancel()}</AlertDialog.Cancel>
                 <AlertDialog.Action
                   class="bg-red-500 text-white hover:bg-red-600 hover:text-white"
                   on:click={() => {
@@ -297,7 +297,7 @@
                   }}
                 >
                   <TrashIcon class="mr-2 h-4 w-4" />
-                  Delete field
+                  {$LL.table.field.delete()}
                 </AlertDialog.Action>
               </AlertDialog.Footer>
             </AlertDialog.Content>

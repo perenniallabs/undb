@@ -8,13 +8,13 @@ import {
   type IBaseSpecification,
 } from "@undb/base"
 import { injectContext, type IContext } from "@undb/context"
-import { executionContext } from "@undb/context/server"
 import { inject, singleton } from "@undb/di"
 import { None, Some, type Option } from "@undb/domain"
 import { injectTableRepository, TableBaseIdSpecification, type ITableRepository } from "@undb/table"
-import { getCurrentTransaction } from "../ctx"
-import type { IQueryBuilder } from "../qb"
+import type { ITxContext } from "../ctx.interface"
+import { injectTxCTX } from "../ctx.provider"
 import { injectQueryBuilder } from "../qb.provider"
+import type { IQueryBuilder } from "../qb.type"
 import { UnderlyingTableService } from "../underlying/underlying-table.service"
 import { BaseFilterVisitor } from "./base.filter-visitor"
 import { BaseMapper } from "./base.mapper"
@@ -35,10 +35,12 @@ export class BaseRepository implements IBaseRepository {
     private readonly underlyingTableService: UnderlyingTableService,
     @injectContext()
     private readonly context: IContext,
+    @injectTxCTX()
+    private readonly txContext: ITxContext,
   ) {}
 
   async find(spec: IBaseSpecification): Promise<Base[]> {
-    const tx = getCurrentTransaction() ?? this.qb
+    const tx = this.txContext.getCurrentTransaction()
     const bases = await tx
       .selectFrom("undb_base")
       .selectAll()
@@ -52,7 +54,8 @@ export class BaseRepository implements IBaseRepository {
     return bases.map((base) => this.mapper.toDo(base))
   }
   async findOne(spec: IBaseSpecification): Promise<Option<Base>> {
-    const base = await (getCurrentTransaction() ?? this.qb)
+    const base = await this.txContext
+      .getCurrentTransaction()
       .selectFrom("undb_base")
       .selectAll()
       .where((eb) => {
@@ -68,7 +71,8 @@ export class BaseRepository implements IBaseRepository {
     const spaceId = this.context.mustGetCurrentSpaceId()
     const spec = WithBaseId.fromString(id).and(new WithBaseSpaceId(spaceId))
 
-    const base = await (getCurrentTransaction() ?? this.qb)
+    const base = await this.txContext
+      .getCurrentTransaction()
       .selectFrom("undb_base")
       .selectAll()
       .where((eb) => {
@@ -81,10 +85,11 @@ export class BaseRepository implements IBaseRepository {
     return base ? Some(this.mapper.toDo(base)) : None
   }
   async insert(base: Base): Promise<void> {
-    const user = executionContext.getStore()?.user?.userId!
+    const user = this.context.mustGetCurrentUserId()
     const values = this.mapper.toEntity(base)
 
-    await getCurrentTransaction()
+    await this.txContext
+      .getCurrentTransaction()
       .insertInto("undb_base")
       .values({
         ...values,
@@ -97,13 +102,13 @@ export class BaseRepository implements IBaseRepository {
     await this.outboxService.save(base)
   }
   async updateOneById(base: Base, spec: IBaseSpecification): Promise<void> {
-    const ctx = executionContext.getStore()
-    const userId = ctx!.user!.userId!
+    const userId = this.context.mustGetCurrentUserId()
 
     const visitor = new BaseMutateVisitor()
     spec.accept(visitor)
 
-    await getCurrentTransaction()
+    await this.txContext
+      .getCurrentTransaction()
       .updateTable("undb_base")
       .set({ ...visitor.data, updated_by: userId, updated_at: new Date().toISOString() })
       .where((eb) => eb.eb("id", "=", base.id.value))
@@ -112,7 +117,7 @@ export class BaseRepository implements IBaseRepository {
   }
 
   async deleteOneById(id: string): Promise<void> {
-    const trx = getCurrentTransaction()
+    const trx = this.txContext.getCurrentTransaction()
 
     const tables = await this.tableRepository.find(Some(new TableBaseIdSpecification(id)))
     const tableIds = tables.map((t) => t.id.value)

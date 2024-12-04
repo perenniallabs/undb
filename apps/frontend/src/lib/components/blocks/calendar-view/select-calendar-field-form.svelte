@@ -13,6 +13,7 @@
   import { hasPermission } from "$lib/store/space-member.store"
   import { CircleCheckBigIcon } from "lucide-svelte"
   import * as Form from "$lib/components/ui/form"
+  import { LL } from "@undb/i18n/client"
 
   export let readonly = false
 
@@ -64,7 +65,7 @@
     mutationFn: trpc.table.view.update.mutate,
     mutationKey: ["updateView"],
     async onSuccess(data, variables, context) {
-      toast.success("View updated")
+      toast.success($LL.table.view.updated())
       await invalidate(`undb:table:${$table.id.value}`)
     },
   })
@@ -79,7 +80,7 @@
             <Form.Label for="calendar.field">Calendar field</Form.Label>
             <FieldPicker
               disabled={readonly}
-              placeholder="Select a select type field to group calendar lanes"
+              placeholder={$LL.table.view.calendar.select()}
               class="w-full"
               value={$formData.calendar?.field}
               onValueChange={(field) => {
@@ -114,7 +115,7 @@
         disabled={readonly}
       >
         <CircleCheckBigIcon class="mr-2 size-4" />
-        Confirm
+        {$LL.common.confirm()}
       </Button>
     </div>
   {/if}

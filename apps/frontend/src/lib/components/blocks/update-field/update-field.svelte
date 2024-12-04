@@ -6,7 +6,15 @@
   import { getTable } from "$lib/store/table.store"
   import { trpc } from "$lib/trpc/client"
   import { createMutation, useQueryClient } from "@tanstack/svelte-query"
-  import { getIsSystemFieldType, updateFieldDTO, type Field, type FieldValue, type IUpdateFieldDTO } from "@undb/table"
+  import {
+    createUpdateFieldDTO,
+    getIsFieldChangeTypeDisabled,
+    getIsSystemFieldType,
+    updateFieldDTO,
+    type Field,
+    type FieldValue,
+    type IUpdateFieldDTO,
+  } from "@undb/table"
   import { toast } from "svelte-sonner"
   import { derived } from "svelte/store"
   import { Option } from "@undb/domain"
@@ -18,12 +26,19 @@
   import { FieldFactory } from "@undb/table/src/modules/schema/fields/field.factory"
   import { cn } from "$lib/utils"
   import { LoaderCircleIcon, PencilIcon } from "lucide-svelte"
+  import { LL } from "@undb/i18n/client"
+  import { getIsFieldCanCastTo } from "@undb/table"
 
   const table = getTable()
 
   export let field: Field
 
   export let onSuccess: () => void = () => {}
+
+  let type = field.type
+  let updatedType = field.type
+
+  $: isTypeChanged = type !== updatedType
 
   const client = useQueryClient()
   const updateFieldMutation = createMutation(
@@ -32,7 +47,7 @@
       mutationFn: trpc.table.field.update.mutate,
       async onSuccess() {
         onSuccess()
-        toast.success("Update field success")
+        toast.success($LL.table.field.updated())
         await invalidate(`undb:table:${$table.id.value}`)
         await client.invalidateQueries({ queryKey: ["records", $table.id.value] })
         reset()
@@ -43,41 +58,45 @@
     })),
   )
 
-  function getDefaultValue(): IUpdateFieldDTO {
+  function getDefaultValue(field: Field): IUpdateFieldDTO {
+    console.log(field.constraint)
     return {
       id: field.id.value,
       type: field.type,
       name: field.name.value,
       display: !!field.display,
-      defaultValue: (field.defaultValue as Option<FieldValue>)?.unwrapUnchecked()?.value as any,
-      constraint: field.constraint.unwrapUnchecked()?.value,
-      option: field.option.unwrapUnchecked(),
+      defaultValue: (field.defaultValue as Option<FieldValue>)?.into(undefined)?.value as any,
+      constraint: field.constraint?.unwrapUnchecked()?.value ?? {},
+      option: field.option?.unwrapUnchecked() ?? {},
     }
   }
 
-  const form = superForm<IUpdateFieldDTO>(defaults<IUpdateFieldDTO>(getDefaultValue(), zodClient(updateFieldDTO)), {
-    SPA: true,
-    dataType: "json",
-    validators: zodClient(updateFieldDTO),
-    resetForm: false,
-    invalidateAll: false,
-    onSubmit(input) {
-      validateForm({ update: true })
-    },
-    async onUpdate(event) {
-      if (!event.form.valid) {
-        console.log(event.form.errors, event.form.data)
-        return
-      }
-      const data = event.form.data
-      const field = FieldFactory.fromJSON(data).toJSON()
+  const form = superForm<IUpdateFieldDTO>(
+    defaults<IUpdateFieldDTO>(getDefaultValue(field), zodClient(updateFieldDTO)),
+    {
+      SPA: true,
+      dataType: "json",
+      validators: zodClient(updateFieldDTO),
+      resetForm: false,
+      invalidateAll: false,
+      onSubmit(input) {
+        validateForm({ update: true })
+      },
+      async onUpdate(event) {
+        if (!event.form.valid) {
+          console.log(event.form.errors, event.form.data)
+          return
+        }
+        const data = event.form.data
+        const field = FieldFactory.fromJSON(data).toJSON()
 
-      await $updateFieldMutation.mutateAsync({
-        tableId: $table.id.value,
-        field,
-      })
+        await $updateFieldMutation.mutateAsync({
+          tableId: $table.id.value,
+          field,
+        })
+      },
     },
-  })
+  )
 
   const { enhance, form: formData, reset, validateForm } = form
 </script>
@@ -86,7 +105,21 @@
   <div class="flex h-8 items-center gap-2">
     <Form.Field {form} name="type" class="h-full">
       <Form.Control let:attrs>
-        <FieldTypePicker {...attrs} bind:value={$formData.type} tabIndex={-1} class="h-full" disabled />
+        <FieldTypePicker
+          sameWidth={false}
+          {...attrs}
+          value={$formData.type}
+          tabIndex={-1}
+          class="h-full"
+          filter={(field) => getIsFieldCanCastTo($formData.type, field)}
+          disabled={getIsFieldChangeTypeDisabled($formData.type)}
+          onValueChange={(value) => {
+            form.reset()
+            $formData.type = value
+            updatedType = value
+            $formData = createUpdateFieldDTO($table, field, value)
+          }}
+        />
       </Form.Control>
       <Form.Description />
       <Form.FieldErrors />
@@ -100,6 +133,10 @@
       <Form.FieldErrors />
     </Form.Field>
   </div>
+
+  {#if isTypeChanged}
+    <div class="text-xs text-yellow-600">{$LL.table.field.typeChanged()}</div>
+  {/if}
 
   <div use:autoAnimate>
     {#if !getIsSystemFieldType($formData.type)}
@@ -128,7 +165,7 @@
       {:else}
         <PencilIcon class="mr-2 h-4 w-4" />
       {/if}
-      Update Field
+      {$LL.table.field.update()}
     </Button>
   </div>
 </form>
